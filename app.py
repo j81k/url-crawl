@@ -7,10 +7,11 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from config import *
 from db import *
 
+linesep = os.linesep
 bs4_prettify = BS.prettify
 regex_pretty = re.compile(r'^(\s*)', re.MULTILINE)
-def prettify(self, encoding = None, formatter = 'minimal', indent = 4):
-	return regex_pretty.sub(r'\1' * indent, bs4_prettify(self)) #, encoding, formatter))
+def prettify(self, encoding = None, formatter = 'html', indent = 4):
+	return regex_pretty.sub(r'\1' * indent, bs4_prettify(self, encoding, formatter))
 
 BS.prettify = prettify	 
 
@@ -87,11 +88,9 @@ def extract(tags, index = [-1]):
 			for attr in ['id', 'class', 'style']:
 				del tag[attr]
 
-		if format_html:		
-			html += child.prettify().encode("utf-8")	
-		else:	
-			html += str(child).replace('\n', '')
+		html += str(child.prettify().encode("utf-8"))
 	return html	
+
 
 def parse(filename, html):
 
@@ -159,6 +158,7 @@ if __name__ == '__main__':
 		if i > 1000000:
 			break
 		elif (ext == 'json'):
+			name = url['label']
 			url = site_url + url['url']
 		elif url.strip() == '' or '#------' in url:
 			continue
@@ -171,19 +171,20 @@ if __name__ == '__main__':
 			header, content = parse(filename, html)
 			write_file(filename, header + '<!-- CONTENT BEGINS -->' + content)
 			args = {
+				'name'  : name,
 				'slug' 	: filename,
 				'url'	: url,
-				'header': header,
-				'content': content 
+				'header': header.replace(linesep, ''),
+				'content': content.replace(linesep, '') 
 			}
-			##db.insert(args)
+			db.insert(args)
 			if not content:
 				url_prefix = '[Empty\t]' 
 			else:
 				url_prefix = '[Ok  \t]'
 			url = url_prefix + ': ' + url
 
-		fh.write(url + os.linesep)
+		fh.write(url + linesep)
 		print url
 		
 	fh.close()	

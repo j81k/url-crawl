@@ -2,7 +2,6 @@
 site_url = 'http://cmol.creditmantri.in/' #'https://www.creditmantri.com/'
 filename = './links.json'
 htmlpath = './html/'
-format_html = True
 
 DB_USER = 'root'
 DB_PASS = 'Credit@210'

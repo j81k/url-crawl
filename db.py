@@ -36,6 +36,7 @@ class DB():
 		tables['pages']	= (
 			"CREATE TABLE IF NOT EXISTS `pages` ("
 			"	`id` INT(11) NOT NULL AUTO_INCREMENT,"
+			"	`name` MEDIUMTEXT NULL,"
 			"	`slug` TEXT NULL,"
 			"	`url` VARCHAR(255) NULL,"
 			"	`header` LONGTEXT NULL,"
