@@ -21,8 +21,6 @@ class DB():
 			"VALUES("+ values_str[:-1] +")"
 		)
 
-		print "Query: " + sql
-		print tuple(values)
 		self.cursor.execute(sql, tuple(values)) #, self.cnx)
 		self.cnx.commit()
 	

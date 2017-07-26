@@ -66,6 +66,33 @@ def download(url):
 	except urllib2.HTTPError as e:
 		return -1, str(e) 
 
+def extract(tags, index = [-1]):
+	html = ''.join(str(tag) for tag in tags)
+	soup = BS(html, "lxml").find('body')
+	
+	try:
+		children = soup.findChildren(recursive=False)##[0]
+	except Exception as e:
+		print "[Soup Error]: %s" % str(e)
+		return ''
+	
+	i = -1
+	html = ''
+	for child in children:
+		i += 1
+		if index[0] != -1 and i not in index:
+			continue 
+
+		for tag in child.findParent().findAll(True):
+			for attr in ['id', 'class', 'style']:
+				del tag[attr]
+
+		if format_html:		
+			html += child.prettify().encode("utf-8")	
+		else:	
+			html += str(child).replace('\n', '')
+	return html	
+
 def parse(filename, html):
 
 	# <div class="pd-tp-20 pd-bt-20 equifax-content" (about-equifax-india)
@@ -73,14 +100,17 @@ def parse(filename, html):
 
 	# <div class="col-sm-8 col-lg-9					(credit-card-customer-care | fixed-deposit-rate)
 	# <div class="col-sm-9 pd-tp-20"				(-credit-card-customer-care-number | -fixed-deposit-rate)
-	# <div class=""
-
+	
 	# <section class="container-fluid pd20" 		(*-loan)
-	#				="container-fluid pd20" 	
+	# container-fluid pd20, 3 						(shopping-credit-cards) 
 
-	# (jaipur-credit-card)
-
+	index = [-1]
 	soup = BS(html, "lxml")
+
+	content = ''
+	tags = soup.select('div#no-products')
+	header = extract(tags)
+
 	pat = 'section.container-fluid.pd20'
 	if filename == 'about-equifax-india':
 		pat = 'div.pd-tp-20.pd-bt-2.equifax-content div.col-sm-9'
@@ -89,18 +119,20 @@ def parse(filename, html):
 	elif '-credit-card-customer-care-number' in filename or '-fixed-deposit-rate' in filename:
 		pat = 'div.col-sm-9.pd-tp-20'
 	elif '-credit-card' in filename:
-		pat = 'div.lendersnew-layout div.container'	
+		if 'lifestyle' in filename or 'fuel' in filename or 'shopping' in filename or 'cashback' in filename or 'travel' in filename or 'entertainment' in filename or filename.partition(' ')[0] == 'rewards':
+			index = [1]
+			pat = 'div.lendersnew-layout > section.container-fluid.pd20'
+		else :
+			pat = 'div.lendersnew-layout > div.container'
+	elif '-personal-loan':
+		pat = 'div.lendersnew-layout'
+		tags = soup.select(pat + ' > section.container-fluid')
+		content += extract(tags, [2])
+		pat += ' > div.container'	
 
 	tags = soup.select(pat)
-	html = ''.join(str(tag) for tag in tags)
-
-	soup = BS(html, "lxml")
-	for tag in soup.findAll(True):
-		for attr in ['id', 'class', 'style']:
-			del tag[attr]
-	if format_html:		
-		return soup.prettify().encode("utf-8")	
-	return str(soup.find('body').findChildren()[0]).replace('\n', '')	
+	content += extract(tags, index)	# index => Array of index values start from 0 (Ex. index = [0, 1, 3] or "[-1]" for all)
+	return header, content
 
 def write_file(filename, html):
 	f = open(htmlpath + filename + '.html', 'wb')
@@ -111,15 +143,7 @@ def write_file(filename, html):
 if __name__ == '__main__':
 	db = DB()
 	db.connect()
-	args = {
-		'slug' 	: 'hello-world',
-		'url'	: 'http://example.com/welcome-to-hello-word' 
-	}
-	db.insert(args)
-	db.close()
-	exit(1)
 	
-
 	makdir(htmlpath)
 	fh = open('./log.txt', 'w')
 
@@ -132,7 +156,7 @@ if __name__ == '__main__':
 	i = 0	
 	for url in urls:
 		i += 1
-		if i > 1:
+		if i > 1000000:
 			break
 		elif (ext == 'json'):
 			url = site_url + url['url']
@@ -144,13 +168,24 @@ if __name__ == '__main__':
 			# Download failed
 			url = '[Error\t]: %s (%r)' % (url, html)
 		else:	 
-			#print "Parsing ... \"%s\"" % filename
-			html = parse(filename, html)
-			write_file(filename, html)
-			url = '[Ok  \t]: ' + url
+			header, content = parse(filename, html)
+			write_file(filename, header + '<!-- CONTENT BEGINS -->' + content)
+			args = {
+				'slug' 	: filename,
+				'url'	: url,
+				'header': header,
+				'content': content 
+			}
+			##db.insert(args)
+			if not content:
+				url_prefix = '[Empty\t]' 
+			else:
+				url_prefix = '[Ok  \t]'
+			url = url_prefix + ': ' + url
 
 		fh.write(url + os.linesep)
 		print url
 		
 	fh.close()	
-
+	db.close()
+	
