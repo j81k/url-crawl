@@ -1,6 +1,10 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from bs4 import BeautifulSoup as BS
 import urllib2
 import os, json, re
+from htmlmin.minify import html_minify
 
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -10,10 +14,13 @@ from db import *
 linesep = os.linesep
 bs4_prettify = BS.prettify
 regex_pretty = re.compile(r'^(\s*)', re.MULTILINE)
-def prettify(self, encoding = None, formatter = 'html', indent = 4):
+def prettify(self, encoding = "ascii", formatter = 'html', indent = 4):
 	return regex_pretty.sub(r'\1' * indent, bs4_prettify(self, encoding, formatter))
 
 BS.prettify = prettify	 
+
+def compress(html):
+	return html_minify(html).replace('<html><head></head><body>', '').replace('</body></html>', '') #, remove_empty_space = True)
 
 def makdir(path):
 	try:	
@@ -63,7 +70,7 @@ def download(url):
 			print status,
 
 		print status
-		return filename, html 
+		return filename, html
 	except urllib2.HTTPError as e:
 		return -1, str(e) 
 
@@ -88,7 +95,8 @@ def extract(tags, index = [-1]):
 			for attr in ['id', 'class', 'style']:
 				del tag[attr]
 
-		html += str(child.prettify().encode("utf-8"))
+		html += child.prettify().encode('ascii', 'replace').decode('ascii')
+
 	return html	
 
 
@@ -140,6 +148,7 @@ def write_file(filename, html):
 	f.close()	
 
 if __name__ == '__main__':
+
 	db = DB()
 	db.connect()
 	
@@ -174,10 +183,11 @@ if __name__ == '__main__':
 				'name'  : name,
 				'slug' 	: filename,
 				'url'	: url,
-				'header': header.replace(linesep, ''),
-				'content': content.replace(linesep, '') 
+				'header': compress(header), #.replace(linesep, ''),
+				'content': compress(content) #content.replace(linesep, '') 
 			}
 			db.insert(args)
+
 			if not content:
 				url_prefix = '[Empty\t]' 
 			else:
